@@ -6,6 +6,7 @@ Created on Thu Sep 14 22:25:31 2017
 """
 
 from keras.layers import Dense, Flatten
+from keras.layers import Conv1D, MaxPooling1D
 from keras.layers import Conv2D, MaxPooling2D, Merge, Dropout, add, concatenate, Reshape
 from keras.optimizers import SGD
 from keras.models import Sequential
@@ -18,6 +19,7 @@ from keras.layers.advanced_activations import LeakyReLU
 from keras.layers import LSTM
 from keras.layers import TimeDistributed
 from keras.layers import Bidirectional
+from keras.layers.normalization import BatchNormalization
 
 from gensim.models.keyedvectors import KeyedVectors
 model = KeyedVectors.load_word2vec_format('./GoogleNews-vectors-negative300.bin.gz', binary=True)
@@ -30,30 +32,34 @@ maxLenofbody=2600
 # CNN contains one convolution layer, maxpooling layer, dense, dropout, dense
 cnn1=Sequential()
 cnn1.add(Conv2D(64,(2,300), activation = 'relu',input_shape = (maxLenofhead,300,1)))
-#cnn1.add(LeakyReLU(alpha=.01))
+cnn1.add(LeakyReLU(alpha=.01))
 cnn1.add(MaxPooling2D(1,3))
 #cnn1.add(Conv2D(128,(4,1), activation = 'relu'))
 #cnn1.add(MaxPooling2D(1,3))
 #cnn1.summary()
 cnn1.add(Flatten())
 cnn1.add(Dense(100, activation = 'relu'))
+cnn1.add(BatchNormalization())
 cnn1.add(Reshape((100,1)))
 cnn1.add(LSTM(100, return_sequences = False))
 cnn1.add(Dense(100, activation = 'sigmoid'))
+
 
 # Creating second CNN for HYPOTHESIS
 # CNN contains one convolution layer, maxpooling layer, dense, dropout, dense
 cnn2=Sequential()
 cnn2.add(Conv2D(64,(2,300), activation = 'relu',input_shape = (maxLenofbody,300,1)))
-#cnn2.add(LeakyReLU(alpha=.01))
+cnn2.add(LeakyReLU(alpha=.01))
 #cnn2.add(MaxPooling2D(1,5))
 #cnn2.add(Conv2D(128,(4,1), activation = 'relu'))
 cnn2.add(MaxPooling2D(1,3))
 cnn2.add(Flatten())
 cnn2.add(Dense(100, activation = 'relu'))
+cnn2.add(BatchNormalization())
 cnn2.add(Reshape((100,1)))
 cnn2.add(LSTM(100, return_sequences = False))
 cnn2.add(Dense(100, activation = 'sigmoid'))
+
 # Joining two CNN and connecting with a ANN
 classifier2=Sequential()
 classifier2.add(Merge([cnn1,cnn2], mode='concat'))
@@ -61,15 +67,17 @@ classifier2.add(Merge([cnn1,cnn2], mode='concat'))
 # classifier2.add(Dense(70,activation='sigmoid'))
 # classifier2.add(Dropout(0.2))
 classifier2.add(Dense(65,activation='sigmoid'))
+classifier2.add(BatchNormalization())
 classifier2.add(Dropout(0.2))
 classifier2.add(Dense(60,activation='sigmoid'))
+classifier2.add(BatchNormalization())
 classifier2.add(Dropout(0.2))
 classifier2.add(Dense(1,activation='sigmoid'))
 
 sgd = SGD(lr = 0.01, momentum = 0.9, decay=1e-2, nesterov = False)
 classifier2.compile(loss = 'binary_crossentropy', optimizer = 'adam', metrics = ['accuracy'])
 r=random.random()
-fl=open("./prediction.txt","w" )
+fl=open("./prediction_c_l_c.txt","w" )
 for iterr in range(5):
     X=[]
     Y=[]
@@ -153,7 +161,7 @@ for iterr in range(5):
     y_train=np.reshape(y_train,(l,1))
     
     # Training the model
-    classifier2.fit([x_ta, y_ta], y_train, batch_size = 1, epochs = 50, verbose = 1)
+    classifier2.fit([x_ta, y_ta], y_train, batch_size = 32, epochs = 50, verbose = 1)
         
     
     # Start of testing
@@ -238,7 +246,7 @@ for iterr in range(5):
     # Accuracy score
         
     sc=tot/len(X_train)
-    fl.write(str(sc))
+    fl.write("Total score:  "+str(sc))
     fl.write("\n")
 fl.close()
-classifier2.save('cnn_lstm.h5')
+classifier2.save('cnn_lstm1_cnn.h5')
